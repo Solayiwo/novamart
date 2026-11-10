@@ -1,0 +1,70 @@
+name: CD
+
+# Separate from CI: starts only after CI succeeded on main and promotes the SAME image tag (commit SHA).
+# NOTE: workflow_run workflows only run from the default branch (main).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy-staging:
+    name: Deploy to staging
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout manifests at the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Create staging cluster (kind)
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: staging
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy and smoke test
+        run: ./scripts/deploy.sh staging 1
+
+  deploy-production:
+    name: Deploy to production (after approval)
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production   # configure Required reviewers on this environment
+    env:
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout manifests at the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Create production-like cluster (kind)
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: production
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rolling deployment (3 replicas) and verification
+        run: ./scripts/deploy.sh production 3

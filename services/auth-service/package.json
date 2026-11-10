@@ -1,0 +1,26 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NovaMart auth-service (fictional case-study service)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "lint": "node --check src/app.js && node --check src/logic.js && node --check src/server.js",
+    "test": "jest --coverage"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": ["src/**/*.js", "!src/server.js"],
+    "coverageThreshold": {
+      "global": { "statements": 80, "branches": 70, "functions": 80, "lines": 80 }
+    }
+  }
+}
